@@ -13,5 +13,5 @@ export function getGeminiClient(): GoogleGenerativeAI {
   return genAIInstance;
 }
 
-// 使用するモデル（v1betaでgenerateContent対応の最新推奨）
-export const GEMINI_MODEL = "gemini-1.5-flash-002";
+// 使用するモデル（リクエストにより gemini-3-flash を使用）
+export const GEMINI_MODEL = "gemini-3.0-flash";
