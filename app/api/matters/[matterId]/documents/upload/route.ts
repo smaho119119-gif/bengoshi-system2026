@@ -59,10 +59,10 @@ export async function POST(request: NextRequest, context: RouteContext) {
       );
     }
 
-    // ファイルサイズチェック（10MB制限）
-    if (file.size > 10 * 1024 * 1024) {
+    // ファイルサイズチェック（100MB制限）
+    if (file.size > 100 * 1024 * 1024) {
       return NextResponse.json(
-        { error: "ファイルサイズは10MB以下にしてください" },
+        { error: "ファイルサイズは100MB以下にしてください" },
         { status: 400 }
       );
     }

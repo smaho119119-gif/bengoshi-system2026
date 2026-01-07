@@ -94,7 +94,7 @@ export default function FileUpload({ matterId, onUploadComplete }: FileUploadPro
                 クリックしてファイルを選択
               </p>
               <p className="text-sm text-gray-500">
-                PDF, Word, Excel, 画像 (最大10MB)
+                PDF, Word, Excel, 画像 (最大100MB) | 複数選択可能
               </p>
             </>
           )}
