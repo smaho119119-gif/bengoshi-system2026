@@ -96,12 +96,19 @@ export async function POST(request: NextRequest, { params }: { params: { matterI
       }))
     ];
 
+    console.log('[chat] Calling Gemini with', docsWithGemini.length, 'files');
+    console.log('[chat] File URIs:', docsWithGemini.map(d => d.gemini_file_uri));
+
     const result = await ai.models.generateContent({
       model: "gemini-3-flash-preview",
-      contents: parts
+      contents: [{
+        role: "user",
+        parts: parts
+      }]
     });
 
     const answer = result.text || "回答を生成できませんでした";
+    console.log('[chat] Answer generated:', answer.slice(0, 100));
 
     // チャット履歴をDBに保存（service role）
     const serviceClient = createServiceRoleClient();
