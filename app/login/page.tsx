@@ -28,9 +28,6 @@ export default function LoginPage() {
         const { error } = await supabase.auth.signUp({
           email,
           password,
-          options: {
-            emailRedirectTo: `${window.location.origin}/auth/callback`,
-          },
         });
         if (error) throw error;
         setMessage("確認メールを送信しました。メールを確認してください。");
@@ -57,16 +54,8 @@ export default function LoginPage() {
     setError(null);
 
     try {
-      // 現在のURLを取得（Vercel環境でも正しく動作）
-      const redirectUrl = typeof window !== 'undefined' 
-        ? `${window.location.origin}/auth/callback`
-        : '/auth/callback';
-        
       const { error } = await supabase.auth.signInWithOAuth({
         provider: "google",
-        options: {
-          redirectTo: redirectUrl,
-        },
       });
       if (error) throw error;
     } catch (err) {
