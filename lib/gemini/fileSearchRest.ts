@@ -38,7 +38,8 @@ export async function uploadToFileSearchStoreRest(
 ): Promise<{ success: boolean; error?: string }> {
   try {
     const formData = new FormData();
-    const blob = new Blob([fileBuffer], { type: mimeType });
+    const uint8Array = new Uint8Array(fileBuffer);
+    const blob = new Blob([uint8Array], { type: mimeType });
     const file = new File([blob], fileName, { type: mimeType });
     formData.append("file", file);
 

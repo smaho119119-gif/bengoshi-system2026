@@ -190,7 +190,8 @@ export async function POST(request: NextRequest, context: RouteContext) {
       const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
       // 1. Files APIにアップロード
-      const blob = new Blob([buffer], { type: file.type });
+      const uint8Array = new Uint8Array(buffer);
+      const blob = new Blob([uint8Array], { type: file.type });
       const geminiFile = new File([blob], file.name, { type: file.type });
 
       const uploadedFile = await ai.files.upload({
