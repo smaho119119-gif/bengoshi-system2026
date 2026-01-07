@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import type { Matter, Document, MatterStore, ChatMessage } from "@/lib/supabase/types";
@@ -31,6 +31,7 @@ export default function MatterDetail({
   initialMessages,
   userId,
 }: Props) {
+  const [mounted, setMounted] = useState(false);
   const [documents, setDocuments] = useState<Document[]>(initialDocuments);
   const [messages, setMessages] = useState<ChatMessage[]>(initialMessages);
   const [uploading, setUploading] = useState(false);
@@ -44,6 +45,15 @@ export default function MatterDetail({
   const supabase = createClient();
   const [isDragging, setIsDragging] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<string>("");
+
+  // Hydrationずれ防止のため、クライアントマウント後に描画
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  if (!mounted) {
+    return null;
+  }
 
   // ファイルアップロード共通処理
   async function uploadFiles(files: File[]) {
