@@ -182,11 +182,14 @@ export async function POST(request: NextRequest, context: RouteContext) {
       );
     }
 
-    // Gemini Files APIにアップロード（@google/genai使用）
+    // Gemini Files API + File Search Store への登録
     try {
       const { GoogleGenAI } = await import("@google/genai");
+      const { importFileToSearchStore, waitForOperation } = await import("@/lib/gemini/fileSearchDirect");
+      
       const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
+      // 1. Files APIにアップロード
       const blob = new Blob([buffer], { type: file.type });
       const geminiFile = new File([blob], file.name, { type: file.type });
 
@@ -195,9 +198,29 @@ export async function POST(request: NextRequest, context: RouteContext) {
         config: { displayName: file.name }
       });
 
-      console.log(`Gemini Files API upload success: ${uploadedFile.uri}`);
+      console.log(`Files API upload: ${uploadedFile.name}, URI: ${uploadedFile.uri}`);
 
-      // Gemini file URIをDBに保存
+      // 2. File Search Storeにインポート
+      const { data: store } = await supabase
+        .from("matter_stores")
+        .select("store_name")
+        .eq("matter_id", matterId)
+        .maybeSingle();
+
+      if (store?.store_name) {
+        console.log(`Importing to File Search Store: ${store.store_name}`);
+        
+        const operation = await importFileToSearchStore(store.store_name, uploadedFile.name);
+        const success = await waitForOperation(operation.name, 30);
+
+        if (success) {
+          console.log(`File Search Store import success`);
+        } else {
+          console.log(`File Search Store import timeout/failed`);
+        }
+      }
+
+      // 3. file URIをDBに保存
       await serviceClient
         .from("documents")
         .update({
@@ -208,7 +231,6 @@ export async function POST(request: NextRequest, context: RouteContext) {
 
     } catch (geminiError) {
       console.error("Gemini upload failed (non-critical):", geminiError);
-      // Gemini失敗してもSupabaseには保存されているのでエラーにしない
     }
 
     return NextResponse.json({ document });
