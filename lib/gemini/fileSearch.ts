@@ -1,6 +1,4 @@
-import { GoogleGenerativeAI, GoogleAIFileManager } from "@google/generative-ai";
-
-const GEMINI_API_KEY = process.env.GEMINI_API_KEY || "";
+import { getGeminiClient } from "./client";
 
 /**
  * 案件用のFile Search Store情報を作成
@@ -10,16 +8,34 @@ export async function createFileSearchStore(matterId: string): Promise<{
   displayName: string;
 }> {
   const displayName = `FS-${matterId}`;
-  const storeName = `store-${matterId}`;
-
-  return {
-    storeName,
-    displayName,
-  };
+  const storeName = `fileSearchStores/${matterId}`;
+  
+  try {
+    const ai = getGeminiClient();
+    
+    // File Search Storeを作成
+    const store = await ai.fileSearchStores.create({
+      config: { displayName }
+    });
+    
+    console.log(`File Search Store created: ${store.name}`);
+    
+    return {
+      storeName: store.name,
+      displayName
+    };
+  } catch (error) {
+    console.error("Failed to create File Search Store:", error);
+    // 既存のストア名を返す
+    return {
+      storeName,
+      displayName
+    };
+  }
 }
 
 /**
- * Gemini Files APIにファイルをアップロード
+ * Gemini File Search Storeにファイルをアップロード
  */
 export async function uploadToFileSearchStore(
   storeName: string,
@@ -28,23 +44,32 @@ export async function uploadToFileSearchStore(
   mimeType: string
 ): Promise<{ success: boolean; fileUri?: string; error?: string }> {
   try {
-    const fileManager = new GoogleAIFileManager(GEMINI_API_KEY);
+    const ai = getGeminiClient();
     
     // BufferをBlobに変換
     const blob = new Blob([fileBuffer], { type: mimeType });
     const file = new File([blob], fileName, { type: mimeType });
     
-    // Geminiにアップロード
-    const uploadResult = await fileManager.uploadFile(file, {
-      mimeType,
-      displayName: `${storeName}/${fileName}`,
+    // File Search Storeに直接アップロード
+    let operation = await ai.fileSearchStores.uploadToFileSearchStore({
+      file: file as any,
+      fileSearchStoreName: storeName,
+      config: {
+        displayName: fileName,
+      }
     });
 
-    console.log(`File uploaded to Gemini: ${fileName}, URI: ${uploadResult.file.uri}`);
+    // 完了まで待機
+    while (!operation.done) {
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      operation = await ai.operations.get({ operation: operation as any });
+    }
+
+    console.log(`File uploaded to File Search Store: ${fileName}`);
     
     return { 
       success: true, 
-      fileUri: uploadResult.file.uri 
+      fileUri: storeName // storeNameを返す（ドキュメント識別用）
     };
   } catch (error) {
     console.error("Gemini file upload failed:", error);

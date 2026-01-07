@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import { GoogleGenAI } from "@google/genai";
 import { createClient } from "@supabase/supabase-js";
 import { createServiceRoleClient } from "@/lib/supabase/server";
 
@@ -69,51 +69,28 @@ export async function POST(request: NextRequest, { params }: { params: { matterI
     const docsWithGemini = documents.filter(doc => doc.gemini_file_uri);
 
     // Gemini
-    const genAI = new GoogleGenerativeAI(geminiKey);
-    const model = genAI.getGenerativeModel({ 
-      model: "gemini-3-flash-preview"
-    });
+    const ai = new GoogleGenAI({ apiKey: geminiKey });
 
-    let prompt: any[];
-    
-    if (docsWithGemini.length > 0) {
-      // ファイルを参照して回答
-      prompt = [
-        {
-          text: `あなたは弁護士事務所のアシスタントです。
+    // Gemini File Searchでチャット
+    const result = await ai.models.generateContent({
+      model: "gemini-3-flash-preview",
+      contents: `あなたは弁護士事務所のアシスタントです。
 提供されたファイルの内容に基づいて質問に回答してください。
 回答は日本語で、簡潔かつ正確に行ってください。
 
-ユーザーの質問: ${message.trim()}`
-        },
-        ...docsWithGemini.map(doc => ({
-          fileData: {
-            fileUri: doc.gemini_file_uri,
-            mimeType: doc.mime_type
+ユーザーの質問: ${message.trim()}`,
+      config: {
+        tools: [
+          {
+            fileSearch: {
+              fileSearchStoreNames: [storeName]
+            }
           }
-        }))
-      ];
-    } else {
-      // ファイルがGeminiに未登録の場合
-      const fileList = documents.map((doc, i) => 
-        `${i + 1}. ${doc.file_name} (種別: ${doc.doc_type})`
-      ).join('\n');
-      
-      prompt = [{
-        text: `あなたは弁護士事務所のアシスタントです。
-以下のファイルが案件に登録されていますが、ファイル内容はまだ読み込まれていません：
+        ]
+      }
+    });
 
-${fileList}
-
-ファイル名から推測できる範囲で回答し、詳細な内容については「ファイルをダウンロードして確認してください」と案内してください。
-
-ユーザーの質問: ${message.trim()}`
-      }];
-    }
-
-    const result = await model.generateContent(prompt);
-    const response = result.response;
-    const answer = response.text() || "回答を生成できませんでした";
+    const answer = result.text || "回答を生成できませんでした";
 
     // チャット履歴をDBに保存（service role）
     const serviceClient = createServiceRoleClient();
