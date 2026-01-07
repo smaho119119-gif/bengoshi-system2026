@@ -155,11 +155,16 @@ export default function MatterDetail({
         body: JSON.stringify({ message: userMessage }),
       });
 
+      const data = await response.json();
+      
       if (!response.ok) {
-        throw new Error("チャットに失敗しました");
+        // エラーメッセージを表示
+        const errorMsg = data.error || "チャットに失敗しました";
+        alert(`エラー: ${errorMsg}`);
+        throw new Error(errorMsg);
       }
 
-      const { answer, userMessageId, assistantMessageId } = await response.json();
+      const { answer, userMessageId, assistantMessageId } = data;
 
       // 正式なメッセージに置き換え
       setMessages((prev) => {
