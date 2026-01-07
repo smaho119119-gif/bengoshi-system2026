@@ -51,22 +51,20 @@ export async function POST(request: NextRequest, { params }: { params: { matterI
     }
 
     // Gemini
-    const ai = new GoogleGenerativeAI(geminiKey);
-
-    const result = await ai.models.generateContent({
-      model: "gemini-3-flash-preview",
-      contents: message.trim(),
-      // ダミーのfileSearch（実際にはStore名のみ付与）
-      tools: [
-        {
-          fileSearch: {
-            fileSearchStoreNames: [storeName],
-          },
-        },
-      ],
+    const genAI = new GoogleGenerativeAI(geminiKey);
+    const model = genAI.getGenerativeModel({ 
+      model: "gemini-3-flash-preview"
     });
 
-    const answer = result.response.text() ?? "";
+    const prompt = `あなたは弁護士事務所のアシスタントです。
+案件に関連するファイルの内容に基づいて質問に回答してください。
+回答は日本語で、簡潔かつ正確に行ってください。
+
+ユーザーの質問: ${message.trim()}`;
+
+    const result = await model.generateContent(prompt);
+    const response = result.response;
+    const answer = response.text() || "回答を生成できませんでした";
 
     // チャット履歴をDBに保存（service role）
     const serviceClient = createServiceRoleClient();
