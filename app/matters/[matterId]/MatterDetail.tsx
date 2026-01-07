@@ -6,6 +6,16 @@ import { createClient } from "@/lib/supabase/client";
 import type { Matter, Document, MatterStore, ChatMessage } from "@/lib/supabase/types";
 import FileUploadDirect from "./FileUploadDirect";
 
+const dateFormatter = new Intl.DateTimeFormat("ja-JP", {
+  timeZone: "Asia/Tokyo",
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+  hour: "2-digit",
+  minute: "2-digit",
+  second: "2-digit",
+});
+
 interface Props {
   matter: Matter & { client?: { id: string; name: string } };
   initialDocuments: Document[];
@@ -364,7 +374,7 @@ export default function MatterDetail({
                     <div>
                       <p className="font-medium text-gray-900">{doc.file_name}</p>
                       <p className="text-sm text-gray-500">
-                        {new Date(doc.uploaded_at).toLocaleString("ja-JP")}
+                        {dateFormatter.format(new Date(doc.uploaded_at))}
                         {doc.file_size && (
                           <> · {(doc.file_size / 1024 / 1024).toFixed(2)} MB</>
                         )}
