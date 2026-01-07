@@ -3,10 +3,24 @@ import { cookies } from "next/headers";
 import { NextResponse, type NextRequest } from "next/server";
 
 export async function GET(request: NextRequest) {
+  console.log("=== Auth Callback Start ===");
+  console.log("Request URL:", request.url);
+  console.log("Request Headers:", Object.fromEntries(request.headers.entries()));
+  
   const requestUrl = new URL(request.url);
   const code = requestUrl.searchParams.get("code");
+  const error = requestUrl.searchParams.get("error");
+  const errorDescription = requestUrl.searchParams.get("error_description");
+
+  console.log("Query Params:", { code: code?.slice(0, 20) + "...", error, errorDescription });
+
+  if (error) {
+    console.error("OAuth Error:", error, errorDescription);
+    return NextResponse.redirect(new URL(`/login?error=${error}`, request.url));
+  }
 
   if (code) {
+    console.log("Exchanging code for session...");
     const cookieStore = await cookies();
 
     const supabase = createServerClient(
@@ -27,8 +41,23 @@ export async function GET(request: NextRequest) {
       }
     );
 
-    await supabase.auth.exchangeCodeForSession(code);
+    const { data, error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
+    
+    console.log("Exchange Result:", { 
+      success: !!data.session, 
+      user: data.user?.email,
+      error: exchangeError 
+    });
+
+    if (exchangeError) {
+      console.error("Exchange Error:", exchangeError);
+      return NextResponse.redirect(new URL(`/login?error=exchange_failed`, request.url));
+    }
   }
 
-  return NextResponse.redirect(new URL("/dashboard", request.url));
+  console.log("Redirecting to dashboard...");
+  const dashboardUrl = new URL("/dashboard", request.url);
+  console.log("Dashboard URL:", dashboardUrl.toString());
+  
+  return NextResponse.redirect(dashboardUrl);
 }

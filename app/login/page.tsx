@@ -50,15 +50,30 @@ export default function LoginPage() {
 
   // Googleでログイン
   async function handleGoogleLogin() {
+    console.log("=== Google Login Start ===");
+    console.log("Current URL:", window.location.href);
+    console.log("Origin:", window.location.origin);
+    
     setLoading(true);
     setError(null);
 
     try {
-      const { error } = await supabase.auth.signInWithOAuth({
+      console.log("Calling signInWithOAuth...");
+      
+      const { data, error } = await supabase.auth.signInWithOAuth({
         provider: "google",
       });
-      if (error) throw error;
+      
+      console.log("OAuth Response:", { data, error });
+      
+      if (error) {
+        console.error("OAuth Error:", error);
+        throw error;
+      }
+      
+      console.log("OAuth Success - redirecting to:", data.url);
     } catch (err) {
+      console.error("Login Error:", err);
       setError(err instanceof Error ? err.message : "エラーが発生しました");
       setLoading(false);
     }
