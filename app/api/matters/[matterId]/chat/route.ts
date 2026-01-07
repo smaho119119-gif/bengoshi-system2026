@@ -54,7 +54,7 @@ export async function POST(request: NextRequest, { params }: { params: { matterI
     const ai = new GoogleGenerativeAI(geminiKey);
 
     const result = await ai.models.generateContent({
-      model: "gemini-1.5-flash-002",
+      model: "gemini-3-flash-preview",
       contents: message.trim(),
       // ダミーのfileSearch（実際にはStore名のみ付与）
       tools: [
