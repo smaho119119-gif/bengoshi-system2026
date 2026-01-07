@@ -4,7 +4,7 @@ import { useState, useRef } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import type { Matter, Document, MatterStore, ChatMessage } from "@/lib/supabase/types";
-import FileUpload from "./FileUpload";
+import FileUploadDirect from "./FileUploadDirect";
 
 interface Props {
   matter: Matter & { client?: { id: string; name: string } };
@@ -341,9 +341,10 @@ export default function MatterDetail({
             <h2 className="text-lg font-semibold text-gray-900">ファイル一覧</h2>
           </div>
 
-          {/* ファイルアップロードコンポーネント */}
-          <FileUpload
+          {/* ファイルアップロードコンポーネント（直接アップロード） */}
+          <FileUploadDirect
             matterId={matter.id}
+            userId={userId}
             onUploadComplete={(doc) => setDocuments((prev) => [doc, ...prev])}
           />
 
