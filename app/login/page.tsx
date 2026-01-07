@@ -57,10 +57,15 @@ export default function LoginPage() {
     setError(null);
 
     try {
+      // 現在のURLを取得（Vercel環境でも正しく動作）
+      const redirectUrl = typeof window !== 'undefined' 
+        ? `${window.location.origin}/auth/callback`
+        : '/auth/callback';
+        
       const { error } = await supabase.auth.signInWithOAuth({
         provider: "google",
         options: {
-          redirectTo: `${window.location.origin}/auth/callback`,
+          redirectTo: redirectUrl,
         },
       });
       if (error) throw error;
