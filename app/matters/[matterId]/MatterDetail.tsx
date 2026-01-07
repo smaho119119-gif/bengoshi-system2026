@@ -483,7 +483,7 @@ export default function MatterDetail({
                   onChange={(e) => setChatInput(e.target.value)}
                   placeholder="質問を入力..."
                   disabled={chatLoading}
-                  className="flex-1"
+                  className="flex-1 bg-yellow-50 text-gray-900 border-gray-300"
                 />
                 <button
                   type="submit"
