@@ -50,17 +50,66 @@ export async function POST(request: NextRequest, { params }: { params: { matterI
       return NextResponse.json({ ok: false, error: "store_name not found for this matter", requestId }, { status: 400 });
     }
 
+    // 該当案件のドキュメント一覧を取得（gemini_file_uri含む）
+    const { data: documents } = await supabase
+      .from("documents")
+      .select("id, file_name, doc_type, gemini_file_uri, mime_type")
+      .eq("matter_id", matterId)
+      .order("uploaded_at", { ascending: false });
+
+    if (!documents || documents.length === 0) {
+      return NextResponse.json({ 
+        ok: false, 
+        error: "この案件にはまだファイルがアップロードされていません", 
+        requestId 
+      }, { status: 400 });
+    }
+
+    // Gemini File URIが設定されているドキュメントを取得
+    const docsWithGemini = documents.filter(doc => doc.gemini_file_uri);
+
     // Gemini
     const genAI = new GoogleGenerativeAI(geminiKey);
     const model = genAI.getGenerativeModel({ 
       model: "gemini-3-flash-preview"
     });
 
-    const prompt = `あなたは弁護士事務所のアシスタントです。
-案件に関連するファイルの内容に基づいて質問に回答してください。
+    let prompt: any[];
+    
+    if (docsWithGemini.length > 0) {
+      // ファイルを参照して回答
+      prompt = [
+        {
+          text: `あなたは弁護士事務所のアシスタントです。
+提供されたファイルの内容に基づいて質問に回答してください。
 回答は日本語で、簡潔かつ正確に行ってください。
 
-ユーザーの質問: ${message.trim()}`;
+ユーザーの質問: ${message.trim()}`
+        },
+        ...docsWithGemini.map(doc => ({
+          fileData: {
+            fileUri: doc.gemini_file_uri,
+            mimeType: doc.mime_type
+          }
+        }))
+      ];
+    } else {
+      // ファイルがGeminiに未登録の場合
+      const fileList = documents.map((doc, i) => 
+        `${i + 1}. ${doc.file_name} (種別: ${doc.doc_type})`
+      ).join('\n');
+      
+      prompt = [{
+        text: `あなたは弁護士事務所のアシスタントです。
+以下のファイルが案件に登録されていますが、ファイル内容はまだ読み込まれていません：
+
+${fileList}
+
+ファイル名から推測できる範囲で回答し、詳細な内容については「ファイルをダウンロードして確認してください」と案内してください。
+
+ユーザーの質問: ${message.trim()}`
+      }];
+    }
 
     const result = await model.generateContent(prompt);
     const response = result.response;

@@ -1,9 +1,9 @@
-import { getGeminiClient, GEMINI_MODEL } from "./client";
+import { GoogleGenerativeAI, GoogleAIFileManager } from "@google/generative-ai";
+
+const GEMINI_API_KEY = process.env.GEMINI_API_KEY || "";
 
 /**
- * 案件用のFile Search Store情報を作成（ダミー）
- * 注意: Google Generative AI SDKはFile Search Storeを直接サポートしていないため、
- * 代わりにmatter_idベースの識別子を使用
+ * 案件用のFile Search Store情報を作成
  */
 export async function createFileSearchStore(matterId: string): Promise<{
   storeName: string;
@@ -19,18 +19,40 @@ export async function createFileSearchStore(matterId: string): Promise<{
 }
 
 /**
- * File Search Storeにファイルを追加（メタデータのみ保存）
+ * Gemini Files APIにファイルをアップロード
  */
 export async function uploadToFileSearchStore(
   storeName: string,
   fileBuffer: Buffer,
   fileName: string,
   mimeType: string
-): Promise<{ success: boolean; error?: string }> {
-  // ファイルはSupabase Storageに保存されているので、
-  // ここでは成功を返すだけ
-  console.log(`File indexed: ${fileName} for store: ${storeName}`);
-  return { success: true };
+): Promise<{ success: boolean; fileUri?: string; error?: string }> {
+  try {
+    const fileManager = new GoogleAIFileManager(GEMINI_API_KEY);
+    
+    // BufferをBlobに変換
+    const blob = new Blob([fileBuffer], { type: mimeType });
+    const file = new File([blob], fileName, { type: mimeType });
+    
+    // Geminiにアップロード
+    const uploadResult = await fileManager.uploadFile(file, {
+      mimeType,
+      displayName: `${storeName}/${fileName}`,
+    });
+
+    console.log(`File uploaded to Gemini: ${fileName}, URI: ${uploadResult.file.uri}`);
+    
+    return { 
+      success: true, 
+      fileUri: uploadResult.file.uri 
+    };
+  } catch (error) {
+    console.error("Gemini file upload failed:", error);
+    return { 
+      success: false, 
+      error: error instanceof Error ? error.message : "Unknown error" 
+    };
+  }
 }
 
 /**

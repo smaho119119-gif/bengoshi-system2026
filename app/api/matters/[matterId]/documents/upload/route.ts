@@ -182,7 +182,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
       );
     }
 
-    // Gemini File Search Storeに追加（非同期で実行）
+    // Gemini Files APIに追加（同期実行でfile_uriを取得）
     const { data: store } = await supabase
       .from("matter_stores")
       .select("store_name")
@@ -190,16 +190,27 @@ export async function POST(request: NextRequest, context: RouteContext) {
       .single();
 
     if (store?.store_name) {
-      // バックグラウンドで実行（エラーは無視）
-      uploadToFileSearchStore(store.store_name, buffer, file.name, file.type)
-        .then((result) => {
-          if (!result.success) {
-            console.error("Gemini indexing failed:", result.error);
-          }
-        })
-        .catch((err) => {
-          console.error("Gemini indexing error:", err);
-        });
+      const geminiResult = await uploadToFileSearchStore(
+        store.store_name, 
+        buffer, 
+        file.name, 
+        file.type
+      );
+      
+      if (geminiResult.success && geminiResult.fileUri) {
+        // Gemini file URIをDBに保存
+        await serviceClient
+          .from("documents")
+          .update({
+            gemini_file_uri: geminiResult.fileUri,
+            gemini_file_name: file.name
+          })
+          .eq("id", documentId);
+        
+        console.log(`Gemini file URI saved: ${geminiResult.fileUri}`);
+      } else {
+        console.error("Gemini indexing failed:", geminiResult.error);
+      }
     }
 
     return NextResponse.json({ document });
