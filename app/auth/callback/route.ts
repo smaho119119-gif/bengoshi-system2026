@@ -12,7 +12,11 @@ export async function GET(request: NextRequest) {
   const error = requestUrl.searchParams.get("error");
   const errorDescription = requestUrl.searchParams.get("error_description");
 
-  console.log("Query Params:", { code: code?.slice(0, 20) + "...", error, errorDescription });
+  console.log("Query Params:", {
+    code: code ? `${code.slice(0, 8)}...` : undefined,
+    error,
+    errorDescription,
+  });
 
   if (error) {
     console.error("OAuth Error:", error, errorDescription);
