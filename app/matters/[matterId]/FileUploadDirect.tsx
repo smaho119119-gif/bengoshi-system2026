@@ -51,12 +51,16 @@ export default function FileUploadDirect({
         const sha256 = hashArray.map((b) => b.toString(16).padStart(2, "0")).join("");
 
         // 重複チェック
-        const { data: existing } = await supabase
+        const { data: existing, error: dupError } = await supabase
           .from("documents")
           .select("id, file_name")
           .eq("matter_id", matterId)
           .eq("sha256", sha256)
-          .single();
+          .maybeSingle();
+
+        if (dupError && dupError.code !== "PGRST116") {
+          console.error("Duplicate check failed:", dupError);
+        }
 
         if (existing) {
           alert(`${file.name} は既にアップロードされています（${existing.file_name}）`);
