@@ -50,12 +50,22 @@ export async function POST(request: NextRequest, { params }: { params: { matterI
       return NextResponse.json({ ok: false, error: "store_name not found for this matter", requestId }, { status: 400 });
     }
 
+    // 該当案件のドキュメント一覧を取得（gemini_file_uri含む）
+    const { data: documents } = await supabase
+      .from("documents")
+      .select("id, file_name, gemini_file_uri, mime_type")
+      .eq("matter_id", matterId)
+      .order("uploaded_at", { ascending: false });
+
+    // Gemini Files APIにアップロード済みのファイル
+    const docsWithGemini = documents?.filter(doc => doc.gemini_file_uri) || [];
+
     // Gemini
     const ai = new GoogleGenAI({ apiKey: geminiKey });
 
     console.log('[chat] Using File Search with store:', storeName);
 
-    // File Search を使ってチャット（公式ドキュメント準拠）
+    // File Search Store を使用（公式ドキュメント準拠）
     const result = await ai.models.generateContent({
       model: "gemini-3-flash-preview",
       contents: `あなたは弁護士事務所のアシスタントです。
@@ -75,7 +85,7 @@ export async function POST(request: NextRequest, { params }: { params: { matterI
     });
 
     const answer = result.text || "回答を生成できませんでした";
-    console.log('[chat] Answer generated:', answer.slice(0, 100));
+    console.log('[chat] Answer generated:', answer.substring(0, 100));
 
     // チャット履歴をDBに保存（service role）
     const serviceClient = createServiceRoleClient();
