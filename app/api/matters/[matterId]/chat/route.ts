@@ -12,6 +12,11 @@ export async function POST(request: NextRequest, context: RouteContext) {
     const { matterId } = await context.params;
     const supabase = await createServerSupabaseClient();
 
+    // 環境確認ログ（Runtime Logs で確認する用）
+    console.log("[chat] matterId:", matterId);
+    console.log("[chat] GEMINI_API_KEY exists:", !!process.env.GEMINI_API_KEY);
+    console.log("[chat] SUPABASE_URL exists:", !!process.env.NEXT_PUBLIC_SUPABASE_URL);
+
     // 認証チェック
     const {
       data: { user },
@@ -54,7 +59,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
     if (chatError) {
       console.error("Chat error:", chatError);
       return NextResponse.json(
-        { error: "回答の生成に失敗しました" },
+        { error: "回答の生成に失敗しました", detail: chatError },
         { status: 500 }
       );
     }
@@ -107,7 +112,10 @@ export async function POST(request: NextRequest, context: RouteContext) {
   } catch (error) {
     console.error("Chat failed:", error);
     return NextResponse.json(
-      { error: "Internal server error" },
+      {
+        error: "Internal server error",
+        detail: error instanceof Error ? error.message : String(error),
+      },
       { status: 500 }
     );
   }
