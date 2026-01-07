@@ -1,17 +1,17 @@
-import { GoogleGenAI } from "@google/genai";
+import { GoogleGenerativeAI } from "@google/generative-ai";
 
-let genAIInstance: GoogleGenAI | null = null;
+let genAIInstance: GoogleGenerativeAI | null = null;
 
-export function getGeminiClient(): GoogleGenAI {
+export function getGeminiClient(): GoogleGenerativeAI {
   if (!genAIInstance) {
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
       throw new Error("GEMINI_API_KEY is not set");
     }
-    genAIInstance = new GoogleGenAI({ apiKey });
+    genAIInstance = new GoogleGenerativeAI(apiKey);
   }
   return genAIInstance;
 }
 
 // 使用するモデル
-export const GEMINI_MODEL = "gemini-2.0-flash";
+export const GEMINI_MODEL = "gemini-1.5-flash";

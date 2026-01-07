@@ -4,6 +4,7 @@ import { useState, useRef } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import type { Matter, Document, MatterStore, ChatMessage } from "@/lib/supabase/types";
+import FileUpload from "./FileUpload";
 
 interface Props {
   matter: Matter & { client?: { id: string; name: string } };
@@ -28,18 +29,24 @@ export default function MatterDetail({
   const [activeTab, setActiveTab] = useState<"files" | "chat">("files");
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const dropZoneRef = useRef<HTMLDivElement>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
   const supabase = createClient();
+  const [isDragging, setIsDragging] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<string>("");
 
-  // ファイルアップロード
-  async function handleUpload(e: React.ChangeEvent<HTMLInputElement>) {
-    const files = e.target.files;
-    if (!files || files.length === 0) return;
+  // ファイルアップロード共通処理
+  async function uploadFiles(files: File[]) {
+    if (files.length === 0) return;
 
     setUploading(true);
+    setUploadProgress("");
 
     try {
-      for (const file of Array.from(files)) {
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        setUploadProgress(`${i + 1}/${files.length}: ${file.name}`);
+        
         const formData = new FormData();
         formData.append("file", file);
 
@@ -50,20 +57,54 @@ export default function MatterDetail({
 
         if (!response.ok) {
           const error = await response.json();
-          throw new Error(error.message || "アップロードに失敗しました");
+          throw new Error(error.message || error.error || "アップロードに失敗しました");
         }
 
         const { document } = await response.json();
         setDocuments((prev) => [document, ...prev]);
       }
+      setUploadProgress("完了！");
+      setTimeout(() => setUploadProgress(""), 2000);
     } catch (error) {
       console.error("Upload failed:", error);
       alert(error instanceof Error ? error.message : "アップロードに失敗しました");
+      setUploadProgress("");
     } finally {
       setUploading(false);
       if (fileInputRef.current) {
         fileInputRef.current.value = "";
       }
+    }
+  }
+
+  // ファイル選択からアップロード
+  async function handleUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+    await uploadFiles(Array.from(files));
+  }
+
+  // ドラッグ&ドロップ
+  function handleDragOver(e: React.DragEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(true);
+  }
+
+  function handleDragLeave(e: React.DragEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+  }
+
+  async function handleDrop(e: React.DragEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+
+    const files = Array.from(e.dataTransfer.files);
+    if (files.length > 0) {
+      await uploadFiles(files);
     }
   }
 
@@ -298,31 +339,17 @@ export default function MatterDetail({
         <div className="card">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-lg font-semibold text-gray-900">ファイル一覧</h2>
-            <div>
-              <input
-                ref={fileInputRef}
-                type="file"
-                multiple
-                onChange={handleUpload}
-                className="hidden"
-                accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png,.gif,.webp"
-              />
-              <button
-                onClick={() => fileInputRef.current?.click()}
-                disabled={uploading}
-                className="btn btn-primary text-sm"
-              >
-                {uploading ? "アップロード中..." : "+ ファイルを追加"}
-              </button>
-            </div>
           </div>
 
+          {/* ファイルアップロードコンポーネント */}
+          <FileUpload
+            matterId={matter.id}
+            onUploadComplete={(doc) => setDocuments((prev) => [doc, ...prev])}
+          />
+
           {documents.length === 0 ? (
-            <div className="text-center py-8 text-gray-500">
-              <p>ファイルがまだありません</p>
-              <p className="text-sm mt-1">
-                PDF, Word, Excel, 画像ファイルをアップロードできます
-              </p>
+            <div className="text-center py-4 text-gray-500">
+              <p className="text-sm">アップロードされたファイルがここに表示されます</p>
             </div>
           ) : (
             <div className="space-y-2">

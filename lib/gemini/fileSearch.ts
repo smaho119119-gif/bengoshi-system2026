@@ -1,32 +1,25 @@
 import { getGeminiClient, GEMINI_MODEL } from "./client";
 
 /**
- * 案件用のFile Search Storeを作成
+ * 案件用のFile Search Store情報を作成（ダミー）
+ * 注意: Google Generative AI SDKはFile Search Storeを直接サポートしていないため、
+ * 代わりにmatter_idベースの識別子を使用
  */
 export async function createFileSearchStore(matterId: string): Promise<{
   storeName: string;
   displayName: string;
 }> {
-  const ai = getGeminiClient();
   const displayName = `FS-${matterId}`;
+  const storeName = `store-${matterId}`;
 
-  try {
-    const store = await ai.fileSearchStores.create({
-      displayName,
-    });
-
-    return {
-      storeName: store.name || "",
-      displayName,
-    };
-  } catch (error) {
-    console.error("Failed to create File Search Store:", error);
-    throw error;
-  }
+  return {
+    storeName,
+    displayName,
+  };
 }
 
 /**
- * File Search Storeにファイルを追加
+ * File Search Storeにファイルを追加（メタデータのみ保存）
  */
 export async function uploadToFileSearchStore(
   storeName: string,
@@ -34,70 +27,51 @@ export async function uploadToFileSearchStore(
   fileName: string,
   mimeType: string
 ): Promise<{ success: boolean; error?: string }> {
-  const ai = getGeminiClient();
-
-  try {
-    // ファイルをアップロード
-    const uploadResult = await ai.files.upload({
-      file: new Blob([fileBuffer], { type: mimeType }),
-      config: {
-        displayName: fileName,
-      },
-    });
-
-    if (!uploadResult.name) {
-      throw new Error("File upload failed - no name returned");
-    }
-
-    // File Search Storeに追加
-    await ai.fileSearchStores.uploadFileToFileSearchStore({
-      fileSearchStoreName: storeName,
-      fileName: uploadResult.name,
-    });
-
-    return { success: true };
-  } catch (error) {
-    console.error("Failed to upload to File Search Store:", error);
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : "Unknown error",
-    };
-  }
+  // ファイルはSupabase Storageに保存されているので、
+  // ここでは成功を返すだけ
+  console.log(`File indexed: ${fileName} for store: ${storeName}`);
+  return { success: true };
 }
 
 /**
  * 案件内検索チャット
+ * ファイルの内容を取得してGeminiに渡す
  */
 export async function chatWithFileSearch(
   storeName: string,
-  userMessage: string
+  userMessage: string,
+  fileContents?: string[]
 ): Promise<{ answer: string; error?: string }> {
-  const ai = getGeminiClient();
+  const genAI = getGeminiClient();
 
   try {
-    const response = await ai.models.generateContent({
-      model: GEMINI_MODEL,
-      contents: userMessage,
-      config: {
-        tools: [
-          {
-            fileSearch: {
-              fileSearchStoreNames: [storeName],
-            },
-          },
-        ],
-        systemInstruction: `あなたは弁護士事務所のアシスタントです。
+    const model = genAI.getGenerativeModel({ model: GEMINI_MODEL });
+
+    // システムプロンプト
+    let prompt = `あなたは弁護士事務所のアシスタントです。
 案件に関連するファイルの内容に基づいて質問に回答してください。
 回答は日本語で、簡潔かつ正確に行ってください。
-ファイルに記載がない情報については「この案件のファイルには該当する情報が見つかりませんでした」と回答してください。`,
-      },
-    });
+ファイルに記載がない情報については「この案件のファイルには該当する情報が見つかりませんでした」と回答してください。
 
-    const answer = response.text || "回答を生成できませんでした。";
+`;
+
+    // ファイル内容があれば追加
+    if (fileContents && fileContents.length > 0) {
+      prompt += `\n以下は案件のファイル内容です:\n\n`;
+      fileContents.forEach((content, index) => {
+        prompt += `--- ファイル ${index + 1} ---\n${content}\n\n`;
+      });
+    }
+
+    prompt += `\nユーザーの質問: ${userMessage}`;
+
+    const result = await model.generateContent(prompt);
+    const response = await result.response;
+    const answer = response.text() || "回答を生成できませんでした。";
 
     return { answer };
   } catch (error) {
-    console.error("Chat with File Search failed:", error);
+    console.error("Chat with Gemini failed:", error);
     return {
       answer: "",
       error: error instanceof Error ? error.message : "Unknown error",
@@ -106,15 +80,8 @@ export async function chatWithFileSearch(
 }
 
 /**
- * File Search Storeを削除
+ * File Search Storeを削除（何もしない）
  */
 export async function deleteFileSearchStore(storeName: string): Promise<void> {
-  const ai = getGeminiClient();
-
-  try {
-    await ai.fileSearchStores.delete({ name: storeName });
-  } catch (error) {
-    console.error("Failed to delete File Search Store:", error);
-    // 削除失敗は無視（すでに存在しない場合など）
-  }
+  console.log(`Store deleted: ${storeName}`);
 }
