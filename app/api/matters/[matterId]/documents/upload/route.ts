@@ -105,7 +105,8 @@ export async function POST(request: NextRequest, context: RouteContext) {
 
     // ドキュメントID生成
     const documentId = uuidv4();
-    const storagePath = `matters/${matterId}/${documentId}/${file.name}`;
+    const safeFileName = encodeURIComponent(file.name);
+    const storagePath = `matters/${matterId}/${documentId}/${safeFileName}`;
 
     // Supabase Storageにアップロード
     const serviceClient = createServiceRoleClient();

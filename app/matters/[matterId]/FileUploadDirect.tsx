@@ -57,7 +57,9 @@ export default function FileUploadDirect({
 
         // ドキュメントID生成
         const documentId = uuidv4();
-        const storagePath = `matters/${matterId}/${documentId}/${file.name}`;
+        // Supabase Storageのキーは安全な文字列にエンコードして格納
+        const safeFileName = encodeURIComponent(file.name);
+        const storagePath = `matters/${matterId}/${documentId}/${safeFileName}`;
 
         // Supabase Storageに直接アップロード
         const { error: uploadError } = await supabase.storage
