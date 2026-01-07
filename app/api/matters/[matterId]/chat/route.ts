@@ -60,32 +60,42 @@ export async function POST(request: NextRequest, { params }: { params: { matterI
     // Gemini Files APIにアップロード済みのファイル
     const docsWithGemini = documents?.filter(doc => doc.gemini_file_uri) || [];
 
+    if (docsWithGemini.length === 0) {
+      return NextResponse.json({ 
+        ok: false, 
+        error: "この案件にはGemini APIに登録されたファイルがありません", 
+        requestId 
+      }, { status: 400 });
+    }
+
     // Gemini
     const ai = new GoogleGenAI({ apiKey: geminiKey });
 
-    console.log('[chat] Using File Search with store:', storeName);
+    console.log('[chat] Using', docsWithGemini.length, 'files directly');
+    console.log('[chat] File URIs:', docsWithGemini.map(d => d.gemini_file_uri));
 
-    // File Search Store を使用（公式ドキュメント準拠）
-    const result = await ai.models.generateContent({
-      model: "gemini-3-flash-preview",
-      contents: `あなたは弁護士事務所のアシスタントです。
-提供されたファイルの内容に基づいて質問に回答してください。
+    // Files APIでアップロード済みのファイルを直接参照
+    const parts = [
+      { text: `あなたは弁護士事務所のアシスタントです。
+提供されたPDFファイルの内容を読み、質問に回答してください。
 回答は日本語で、簡潔かつ正確に行ってください。
 
-ユーザーの質問: ${message.trim()}`,
-      config: {
-        tools: [
-          {
-            fileSearch: {
-              fileSearchStoreNames: [storeName]
-            }
-          }
-        ]
-      }
+ユーザーの質問: ${message.trim()}` },
+      ...docsWithGemini.map(doc => ({
+        fileData: {
+          fileUri: doc.gemini_file_uri,
+          mimeType: doc.mime_type
+        }
+      }))
+    ];
+
+    const result = await ai.models.generateContent({
+      model: "gemini-3-flash-preview",
+      contents: parts
     });
 
     const answer = result.text || "回答を生成できませんでした";
-    console.log('[chat] Answer generated:', answer.substring(0, 100));
+    console.log('[chat] Answer length:', answer.length);
 
     // チャット履歴をDBに保存（service role）
     const serviceClient = createServiceRoleClient();

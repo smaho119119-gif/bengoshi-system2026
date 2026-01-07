@@ -182,35 +182,33 @@ export async function POST(request: NextRequest, context: RouteContext) {
       );
     }
 
-    // Gemini Files APIに追加（同期実行でfile_uriを取得）
-    const { data: store } = await supabase
-      .from("matter_stores")
-      .select("store_name")
-      .eq("matter_id", matterId)
-      .single();
+    // Gemini Files APIにアップロード（@google/genai使用）
+    try {
+      const { GoogleGenAI } = await import("@google/genai");
+      const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
-    if (store?.store_name) {
-      const geminiResult = await uploadToFileSearchStore(
-        store.store_name, 
-        buffer, 
-        file.name, 
-        file.type
-      );
-      
-      if (geminiResult.success && geminiResult.fileUri) {
-        // Gemini file URIをDBに保存
-        await serviceClient
-          .from("documents")
-          .update({
-            gemini_file_uri: geminiResult.fileUri,
-            gemini_file_name: file.name
-          })
-          .eq("id", documentId);
-        
-        console.log(`Gemini file URI saved: ${geminiResult.fileUri}`);
-      } else {
-        console.error("Gemini indexing failed:", geminiResult.error);
-      }
+      const blob = new Blob([buffer], { type: file.type });
+      const geminiFile = new File([blob], file.name, { type: file.type });
+
+      const uploadedFile = await ai.files.upload({
+        file: geminiFile,
+        config: { displayName: file.name }
+      });
+
+      console.log(`Gemini Files API upload success: ${uploadedFile.uri}`);
+
+      // Gemini file URIをDBに保存
+      await serviceClient
+        .from("documents")
+        .update({
+          gemini_file_uri: uploadedFile.uri,
+          gemini_file_name: file.name
+        })
+        .eq("id", documentId);
+
+    } catch (geminiError) {
+      console.error("Gemini upload failed (non-critical):", geminiError);
+      // Gemini失敗してもSupabaseには保存されているのでエラーにしない
     }
 
     return NextResponse.json({ document });
