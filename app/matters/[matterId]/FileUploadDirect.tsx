@@ -4,6 +4,14 @@ import { useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { v4 as uuidv4 } from "uuid";
 
+// ファイル名を安全なキーに変換（Storage用）
+function sanitizeFileName(name: string) {
+  return name
+    .trim()
+    .replace(/\s+/g, "_")
+    .replace(/[^a-zA-Z0-9._-]/g, "_");
+}
+
 interface FileUploadDirectProps {
   matterId: string;
   userId: string;
@@ -57,8 +65,7 @@ export default function FileUploadDirect({
 
         // ドキュメントID生成
         const documentId = uuidv4();
-        // Supabase Storageのキーは安全な文字列にエンコードして格納
-        const safeFileName = encodeURIComponent(file.name);
+        const safeFileName = sanitizeFileName(file.name);
         const storagePath = `matters/${matterId}/${documentId}/${safeFileName}`;
 
         // Supabase Storageに直接アップロード

@@ -4,6 +4,14 @@ import { uploadToFileSearchStore } from "@/lib/gemini/fileSearch";
 import { calculateSHA256 } from "@/lib/security/hash";
 import { v4 as uuidv4 } from "uuid";
 
+// ファイル名を安全なキーに変換（Storage用）
+function sanitizeFileName(name: string) {
+  return name
+    .trim()
+    .replace(/\s+/g, "_")
+    .replace(/[^a-zA-Z0-9._-]/g, "_");
+}
+
 interface RouteContext {
   params: Promise<{ matterId: string }>;
 }
@@ -85,13 +93,17 @@ export async function POST(request: NextRequest, context: RouteContext) {
     // SHA256ハッシュ計算
     const sha256 = calculateSHA256(buffer);
 
-    // 重複チェック
-    const { data: existingDoc } = await supabase
+    // 重複チェック（レコードなしはOK）
+    const { data: existingDoc, error: dupError } = await supabase
       .from("documents")
       .select("id, file_name")
       .eq("matter_id", matterId)
       .eq("sha256", sha256)
-      .single();
+      .maybeSingle();
+
+    if (dupError && dupError.code !== "PGRST116") {
+      console.error("Duplicate check error:", dupError);
+    }
 
     if (existingDoc) {
       return NextResponse.json(
@@ -105,7 +117,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
 
     // ドキュメントID生成
     const documentId = uuidv4();
-    const safeFileName = encodeURIComponent(file.name);
+    const safeFileName = sanitizeFileName(file.name);
     const storagePath = `matters/${matterId}/${documentId}/${safeFileName}`;
 
     // Supabase Storageにアップロード
