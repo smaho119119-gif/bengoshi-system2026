@@ -182,48 +182,32 @@ export async function POST(request: NextRequest, context: RouteContext) {
       );
     }
 
-    // Gemini Files API + File Search Store への登録
+    // Gemini Files APIにアップロード（公式推奨方式）
     try {
       const { GoogleGenAI } = await import("@google/genai");
-      const { importFileToSearchStore, waitForOperation } = await import("@/lib/gemini/fileSearchDirect");
-      
       const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
-      // 1. Files APIにアップロード
-      const uint8Array = new Uint8Array(buffer);
-      const blob = new Blob([uint8Array], { type: file.type });
-      const geminiFile = new File([blob], file.name, { type: file.type });
+      // 一時ファイルに保存（公式はファイルパス文字列を要求）
+      const tmpPath = `/tmp/${documentId}-${file.name}`;
+      const fs = await import("fs");
+      fs.writeFileSync(tmpPath, buffer);
+
+      console.log(`Uploading to Files API: ${file.name}`);
 
       const uploadedFile = await ai.files.upload({
-        file: geminiFile,
-        config: { displayName: file.name }
+        file: tmpPath,
+        config: { 
+          mimeType: file.type, 
+          displayName: file.name 
+        },
       });
 
-      console.log(`Files API upload: ${uploadedFile.name}, URI: ${uploadedFile.uri}`);
+      console.log(`Files API upload success: ${uploadedFile.uri}`);
 
-      // 2. File Search Storeにインポート
-      const { data: store } = await supabase
-        .from("matter_stores")
-        .select("store_name")
-        .eq("matter_id", matterId)
-        .maybeSingle();
+      // 一時ファイル削除
+      fs.unlinkSync(tmpPath);
 
-      if (store?.store_name && uploadedFile.name) {
-        console.log(`Importing to File Search Store: ${store.store_name}`);
-        
-        const operation = await importFileToSearchStore(store.store_name, uploadedFile.name);
-        const success = await waitForOperation(operation.name, 30);
-
-        if (success) {
-          console.log(`File Search Store import success`);
-        } else {
-          console.log(`File Search Store import timeout/failed`);
-        }
-      } else {
-        console.log(`Skipping File Search Store import (missing store or file name)`);
-      }
-
-      // 3. file URIをDBに保存
+      // file URIをDBに保存
       await serviceClient
         .from("documents")
         .update({
@@ -232,8 +216,11 @@ export async function POST(request: NextRequest, context: RouteContext) {
         })
         .eq("id", documentId);
 
+      console.log(`Gemini URI saved to DB`);
+
     } catch (geminiError) {
       console.error("Gemini upload failed (non-critical):", geminiError);
+      // Gemini失敗してもSupabaseには保存されているのでエラーにしない
     }
 
     return NextResponse.json({ document });

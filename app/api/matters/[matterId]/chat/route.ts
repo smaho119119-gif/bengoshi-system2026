@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { GoogleGenAI } from "@google/genai";
+import { GoogleGenAI, createUserContent, createPartFromUri } from "@google/genai";
 import { createClient } from "@supabase/supabase-js";
 import { createServiceRoleClient } from "@/lib/supabase/server";
 
@@ -68,34 +68,30 @@ export async function POST(request: NextRequest, { params }: { params: { matterI
       }, { status: 400 });
     }
 
-    // Gemini
+    // Gemini（公式推奨方式）
     const ai = new GoogleGenAI({ apiKey: geminiKey });
 
-    console.log('[chat] Using', docsWithGemini.length, 'files directly');
+    console.log('[chat] Using', docsWithGemini.length, 'files');
     console.log('[chat] File URIs:', docsWithGemini.map(d => d.gemini_file_uri));
 
-    // Files APIでアップロード済みのファイルを直接参照
-    const parts = [
-      { text: `あなたは弁護士事務所のアシスタントです。
-提供されたPDFファイルの内容を読み、質問に回答してください。
+    // createPartFromUri でファイルを参照（公式推奨）
+    const fileParts = docsWithGemini.map(doc => 
+      createPartFromUri(doc.gemini_file_uri!, doc.mime_type)
+    );
+
+    const prompt = `あなたは弁護士事務所のアシスタントです。
+提供されたファイルの内容に基づいて質問に回答してください。
 回答は日本語で、簡潔かつ正確に行ってください。
 
-ユーザーの質問: ${message.trim()}` },
-      ...docsWithGemini.map(doc => ({
-        fileData: {
-          fileUri: doc.gemini_file_uri,
-          mimeType: doc.mime_type
-        }
-      }))
-    ];
+ユーザーの質問: ${message.trim()}`;
 
     const result = await ai.models.generateContent({
       model: "gemini-3-flash-preview",
-      contents: parts
+      contents: createUserContent([...fileParts, "\n\n", prompt])
     });
 
     const answer = result.text || "回答を生成できませんでした";
-    console.log('[chat] Answer length:', answer.length);
+    console.log('[chat] Answer:', answer.substring(0, 100));
 
     // チャット履歴をDBに保存（service role）
     const serviceClient = createServiceRoleClient();
