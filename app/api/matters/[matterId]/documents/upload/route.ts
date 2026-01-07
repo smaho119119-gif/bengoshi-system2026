@@ -207,7 +207,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
         .eq("matter_id", matterId)
         .maybeSingle();
 
-      if (store?.store_name) {
+      if (store?.store_name && uploadedFile.name) {
         console.log(`Importing to File Search Store: ${store.store_name}`);
         
         const operation = await importFileToSearchStore(store.store_name, uploadedFile.name);
@@ -218,6 +218,8 @@ export async function POST(request: NextRequest, context: RouteContext) {
         } else {
           console.log(`File Search Store import timeout/failed`);
         }
+      } else {
+        console.log(`Skipping File Search Store import (missing store or file name)`);
       }
 
       // 3. file URIをDBに保存
