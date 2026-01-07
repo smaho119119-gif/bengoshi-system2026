@@ -60,6 +60,13 @@ export default function Header({ userEmail }: HeaderProps) {
             >
               クライアント
             </Link>
+            <Link
+              href="/admin"
+              className="px-3 py-2 text-sm text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg"
+              prefetch={false}
+            >
+              管理
+            </Link>
           </nav>
 
           {/* ユーザーメニュー */}
