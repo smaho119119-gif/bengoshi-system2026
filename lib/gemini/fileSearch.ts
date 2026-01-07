@@ -59,17 +59,26 @@ export async function uploadToFileSearchStore(
       }
     });
 
-    // 完了まで待機
-    while (!operation.done) {
+    console.log(`Upload operation started for: ${fileName}`);
+
+    // 完了まで待機（最大60秒）
+    let attempts = 0;
+    while (!operation.done && attempts < 30) {
       await new Promise(resolve => setTimeout(resolve, 2000));
-      operation = await ai.operations.get({ operation: operation as any });
+      operation = await ai.operations.get({ operation: operation.name as any });
+      attempts++;
+    }
+
+    if (!operation.done) {
+      console.log(`Upload timeout for: ${fileName}`);
+      return { success: false, error: "Upload timeout" };
     }
 
     console.log(`File uploaded to File Search Store: ${fileName}`);
     
     return { 
       success: true, 
-      fileUri: storeName // storeNameを返す（ドキュメント識別用）
+      fileUri: storeName
     };
   } catch (error) {
     console.error("Gemini file upload failed:", error);

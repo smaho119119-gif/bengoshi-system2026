@@ -50,61 +50,28 @@ export async function POST(request: NextRequest, { params }: { params: { matterI
       return NextResponse.json({ ok: false, error: "store_name not found for this matter", requestId }, { status: 400 });
     }
 
-    // 該当案件のドキュメント一覧を取得（gemini_file_uri含む）
-    const { data: documents } = await supabase
-      .from("documents")
-      .select("id, file_name, doc_type, gemini_file_uri, mime_type")
-      .eq("matter_id", matterId)
-      .order("uploaded_at", { ascending: false });
-
-    if (!documents || documents.length === 0) {
-      return NextResponse.json({ 
-        ok: false, 
-        error: "この案件にはまだファイルがアップロードされていません", 
-        requestId 
-      }, { status: 400 });
-    }
-
-    // Gemini File URIが設定されているドキュメントを取得
-    const docsWithGemini = documents.filter(doc => doc.gemini_file_uri);
-
-    if (docsWithGemini.length === 0) {
-      return NextResponse.json({ 
-        ok: false, 
-        error: "ファイルがGemini APIに登録されていません。新しいファイルをアップロードしてください。", 
-        requestId 
-      }, { status: 400 });
-    }
-
     // Gemini
     const ai = new GoogleGenAI({ apiKey: geminiKey });
 
-    // ファイルを参照してチャット
-    const parts = [
-      { 
-        text: `あなたは弁護士事務所のアシスタントです。
+    console.log('[chat] Using File Search with store:', storeName);
+
+    // File Search を使ってチャット（公式ドキュメント準拠）
+    const result = await ai.models.generateContent({
+      model: "gemini-3-flash-preview",
+      contents: `あなたは弁護士事務所のアシスタントです。
 提供されたファイルの内容に基づいて質問に回答してください。
 回答は日本語で、簡潔かつ正確に行ってください。
 
-ユーザーの質問: ${message.trim()}`
-      },
-      ...docsWithGemini.map(doc => ({
-        fileData: {
-          fileUri: doc.gemini_file_uri,
-          mimeType: doc.mime_type
-        }
-      }))
-    ];
-
-    console.log('[chat] Calling Gemini with', docsWithGemini.length, 'files');
-    console.log('[chat] File URIs:', docsWithGemini.map(d => d.gemini_file_uri));
-
-    const result = await ai.models.generateContent({
-      model: "gemini-3-flash-preview",
-      contents: [{
-        role: "user",
-        parts: parts
-      }]
+ユーザーの質問: ${message.trim()}`,
+      config: {
+        tools: [
+          {
+            fileSearch: {
+              fileSearchStoreNames: [storeName]
+            }
+          }
+        ]
+      }
     });
 
     const answer = result.text || "回答を生成できませんでした";
